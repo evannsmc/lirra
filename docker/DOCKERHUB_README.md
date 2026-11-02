@@ -32,8 +32,10 @@ make pull             # pulls this image and tags it locally
 make run              # starts the container with the repository mounted
 ```
 
-The Skydio X2 and blimp synthesis problems need a full Gurobi licence. Use a Gurobi Web License
-Service (WLS) licence (free for academics) saved as `~/gurobi.lic`; `make run` mounts it.
+**You need your own Gurobi licence** for the Skydio X2 and blimp synthesis problems (the bundled
+size-limited licence only covers the double integrator). Use a Gurobi Web License Service (WLS)
+licence, free for academics, saved as `~/gurobi.lic`; `make run` mounts it. Step-by-step instructions:
+[Getting a Gurobi Licence](https://github.com/evannsmc/lirra#getting-a-gurobi-licence).
 
 ## Run Examples
 

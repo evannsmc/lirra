@@ -77,12 +77,14 @@ make build
 make run
 ```
 
-### Gurobi Licence
+### Gurobi Licence (you need your own)
 
-The synthesis problems of the Skydio X2 and the blimp are larger than Gurobi's free size-limited
-licence allows. Academics can get a free **Web License Service (WLS)** licence from Gurobi, which
-works inside containers (machine-locked named-user licences do not). Save it as
-`~/gurobi.lic`; `make run` mounts it into the container.
+LIRRA solves its interval-STL synthesis problems with [Gurobi](https://www.gurobi.com). Gurobi is
+commercial software, so **we cannot ship a licence: every user needs their own.** The `gurobipy`
+package in the image and in `uv.lock` comes with a free *size-limited* licence. That is enough for
+the double integrator, but the Skydio X2 and blimp problems are larger and stop with
+`initial synthesis failed` unless a full licence is found. See
+[Getting a Gurobi licence](#getting-a-gurobi-licence) below.
 
 ### Reproduce a Result
 
@@ -106,6 +108,56 @@ uv run pytest -n 8 -m "not slow"
 
 The [installation page](https://evannsmc.github.io/rl-stl/installation.html) lists every pipeline
 stage and option.
+
+## Getting a Gurobi Licence
+
+Which licence to get depends on how you run LIRRA:
+
+| You are | Running in Docker | Running without Docker |
+|---|---|---|
+| at a university (student, faculty, staff) | free **Academic WLS** licence | free **Academic WLS** or **Academic Named-User** licence |
+| not at a university | a **commercial** or **evaluation** licence from Gurobi (WLS type for Docker) | same |
+
+Machine-locked licences (such as the Academic Named-User licence) are tied to one computer's host ID
+and **do not work inside a container**. WLS (Web License Service) licences are checked online, so
+they work anywhere, including Docker.
+
+### Academic WLS licence (recommended, works in Docker)
+
+1. Create a free account at the [Gurobi User Portal](https://portal.gurobi.com/iam/register/) with
+   your **university email address** and choose the academic user type.
+2. In the portal, open the license request page and request a **WLS Academic** licence (see Gurobi's
+   [academic program page](https://www.gurobi.com/academia/academic-program-and-licenses/) for the
+   current steps and eligibility).
+3. Open the new licence in the portal's licences list and **download** its `gurobi.lic` file. It
+   contains three lines, `WLSACCESSID`, `WLSSECRET` and `LICENSEID`.
+4. Save the file as `~/gurobi.lic` on the machine that runs Docker.
+5. Start the container with `make run`; it mounts `~/gurobi.lic` read-only at Gurobi's default path
+   (`/opt/gurobi/gurobi.lic`). To use another location: `make run GUROBI_LIC=/path/to/gurobi.lic`.
+
+Academic WLS licences are time-limited; renew them in the portal when they expire, and download the
+file again.
+
+### Academic named-user licence (without Docker only)
+
+Request an **Academic Named-User** licence in the same portal and activate it with the `grbgetkey`
+command shown there, **while connected to your university's network**. It writes `gurobi.lic` to your
+home directory, where `gurobipy` finds it automatically.
+
+### Check that the licence is found
+
+Inside the container (`make attach`) or in the `uv` environment:
+
+```bash
+python -c "import gurobipy as gp; m = gp.Model(); print('Gurobi', gp.gurobi.version(), 'licence OK')"
+```
+
+With a full licence, Gurobi's banner names your licence type and holder; with only the
+size-limited one it says `Restricted license - for non-production use only`.
+`make run` also prints a note if it finds no `~/gurobi.lic`, and the container's shell reports which
+licence it found when you attach.
+
+**Never commit a licence file.** It is personal, and `.gitignore` excludes `*.lic`.
 
 ## Repository Layout
 

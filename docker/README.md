@@ -30,13 +30,15 @@ make build-gpu   # CUDA 12 image (lirra:cuda) for training on an NVIDIA GPU
 make run         # add GPU=1 (and IMAGE_NAME=lirra:cuda) to use the GPU
 ```
 
-### Gurobi Licence
+### Gurobi Licence (you need your own)
 
-Synthesis for the Skydio X2 and the blimp needs a full Gurobi licence; the free pip licence only
-covers the small double-integrator problems. Inside a container, use a **Web License Service
-(WLS)** licence, which is free for academics (machine-locked named-user licences do not work in
-containers). Save it as `~/gurobi.lic` (or pass `GUROBI_LIC=/path/to/gurobi.lic`); `make run`
-mounts it read-only. The container prints whether it found the licence when you attach.
+Synthesis for the Skydio X2 and the blimp needs a full Gurobi licence of your own; the size-limited
+licence bundled with `gurobipy` only covers the small double-integrator problems. Inside a container,
+use a **Web License Service (WLS)** licence (free for academics); machine-locked named-user licences
+do not work in containers. Save it as `~/gurobi.lic` (or pass `GUROBI_LIC=/path/to/gurobi.lic`), and
+`make run` mounts it read-only. Step-by-step instructions for getting one and checking that it is
+found are in the main README, under
+[Getting a Gurobi Licence](../README.md#getting-a-gurobi-licence).
 
 ## Container Lifecycle
 
