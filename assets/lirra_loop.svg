@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 440" width="920" height="440" role="img"
+     aria-label="LIRRA runtime loop: learned proposer, feasibility check, cached plan, vehicle, delay-compensated I-STL synthesis">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2b2f36"/>
+    </marker>
+    <style>
+      .box   { stroke: #2b2f36; stroke-width: 1.4; }
+      .t     { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 15px; fill: #1d2128; text-anchor: middle; }
+      .ts    { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12.5px; fill: #3a404a; text-anchor: middle; }
+      .lbl   { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12.5px; fill: #1d2128; }
+      .math  { font-family: 'Times New Roman', Times, serif; font-style: italic; }
+      .arrow { stroke: #2b2f36; stroke-width: 1.8; fill: none; marker-end: url(#ah); }
+    </style>
+  </defs>
+
+  <rect width="920" height="440" fill="#ffffff"/>
+
+  <!-- t = 0-: initial solve -->
+  <rect class="box" x="300" y="16" width="250" height="44" rx="7" fill="#fde3c8"/>
+  <text class="t" x="425" y="44">t = 0⁻: solve 𝒫(x₀, 0, ∅)</text>
+
+  <!-- learned proposer -->
+  <rect class="box" x="22" y="140" width="200" height="66" rx="7" fill="#dbe6f7"/>
+  <text class="t" x="122" y="168">learned proposer</text>
+  <text class="ts" x="122" y="190"><tspan class="math">ũ</tspan>₀:N−1 = π(<tspan class="math">o</tspan><tspan font-size="10" dy="4">k</tspan><tspan dy="-4">)</tspan></text>
+
+  <!-- feasibility check (diamond) -->
+  <path class="box" d="M 425 112 L 560 173 L 425 234 L 290 173 Z" fill="#ece0f3"/>
+  <text class="t" x="425" y="167">feasible point of</text>
+  <text class="t" x="425" y="187">𝒫(x<tspan font-size="11" dy="4">k</tspan><tspan dy="-4">, 0, ℋ</tspan><tspan font-size="11" dy="4">k</tspan><tspan dy="-4">)?</tspan></text>
+
+  <!-- cached plan -->
+  <rect class="box" x="650" y="128" width="250" height="90" rx="7" fill="#d5efd8"/>
+  <text class="t" x="775" y="154">cached plan Π</text>
+  <text class="ts" x="775" y="176">nominal (x̂, û), root, error age, face</text>
+  <text class="ts" x="775" y="196">extended by the terminal controller</text>
+
+  <!-- vehicle -->
+  <rect class="box" x="650" y="296" width="250" height="62" rx="7" fill="#e6e8eb"/>
+  <text class="t" x="775" y="321">vehicle</text>
+  <text class="ts" x="775" y="343">u<tspan font-size="10" dy="4">k</tspan><tspan dy="-4"> = û</tspan><tspan font-size="10" dy="4">k</tspan><tspan dy="-4"> + K(x</tspan><tspan font-size="10" dy="4">k</tspan><tspan dy="-4"> − x̂</tspan><tspan font-size="10" dy="4">k</tspan><tspan dy="-4">)</tspan></text>
+
+  <!-- delay-compensated synthesis -->
+  <rect class="box" x="290" y="290" width="270" height="76" rx="7" fill="#fde3c8"/>
+  <text class="t" x="425" y="314">I-STL MILP from x̂<tspan font-size="11" dy="4">k+d</tspan></text>
+  <text class="ts" x="425" y="335">error age o<tspan font-size="10" dy="4">r</tspan><tspan dy="-4">+k+d−r, warm start Π</tspan></text>
+  <text class="ts" x="425" y="354">returns by k+d, checked</text>
+
+  <!-- proposer -> check -->
+  <path class="arrow" d="M 222 173 L 288 173"/>
+  <!-- check -> cache (yes) -->
+  <path class="arrow" d="M 560 173 L 648 173"/>
+  <text class="lbl" x="604" y="158" text-anchor="middle">yes:</text>
+  <text class="lbl" x="604" y="196" text-anchor="middle">Π ← proposal</text>
+  <!-- check -> synthesis (no) -->
+  <path class="arrow" d="M 425 234 L 425 288"/>
+  <text class="lbl" x="433" y="266">no</text>
+  <!-- synthesis -> cache (installed) -->
+  <path class="arrow" d="M 560 312 L 690 220"/>
+  <text class="lbl" x="560" y="258" transform="rotate(-35 600 262)">installed at k+d</text>
+  <!-- cache -> vehicle (fly) -->
+  <path class="arrow" d="M 775 218 L 775 294"/>
+  <text class="lbl" x="783" y="262">fly</text>
+  <!-- initial solve -> cache -->
+  <path class="arrow" d="M 550 38 L 775 38 L 775 126"/>
+  <text class="lbl" x="660" y="30" text-anchor="middle">Π₀</text>
+  <!-- vehicle -> proposer (feedback) -->
+  <path class="arrow" d="M 775 358 L 775 404 L 122 404 L 122 208"/>
+  <text class="lbl" x="450" y="426" text-anchor="middle">x<tspan font-size="10" dy="4">k</tspan><tspan dy="-4">, outputs y</tspan><tspan font-size="10" dy="4">k−h+1:k</tspan><tspan dy="-4">, waypoint, uncertainty bound</tspan></text>
+</svg>

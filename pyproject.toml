@@ -1,0 +1,69 @@
+[project]
+name = "rl-stl"
+version = "0.1.0"
+description = "LIRRA: learned trajectory proposals for recursively feasible interval-STL runtime assurance"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Simulation / learning stack (JAX-native)
+    "mujoco==3.13.0",
+    "mujoco-mjx==3.13.0",
+    "playground==0.2.0",
+    "brax==0.14.2",
+    "jax==0.11.1",
+    "flax==0.12.9",
+    "optax==0.2.8",
+    "ml-collections==1.1.0",
+    # STL layer and MICP solver (host-side, never inside JIT)
+    "stlpy==0.3.0",
+    "gurobipy==13.0.3",
+    # Utilities
+    "numpy",
+    "scipy",
+    "pyyaml",
+    "pandas",
+    "pyarrow",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+# GPU on the cluster: `uv sync --extra cuda12`
+cuda12 = ["jax[cuda12]==0.11.1"]
+wandb = ["wandb"]
+
+[tool.uv.sources]
+# Brax 0.14.2 on PyPI calls jax.device_put_replicated, removed in JAX 0.10. Brax main
+# (still versioned 0.14.2) has the upstream fix (303d89d). Switch back to PyPI once a
+# release newer than 0.14.2 exists.
+brax = { git = "https://github.com/google/brax", rev = "57d5b863fcc66a29a2e043182c07a14a3dee3a7c" }
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-xdist",
+    "ruff",
+    "ipykernel",
+    "jupyter",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rl_stl"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "gurobi_full: needs a full (non size-limited) Gurobi licence",
+    "slow: slow test (JIT compilation, training smoke runs)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Frozen-dataclass defaults are immutable, so call-in-default is safe here.
+extend-ignore = ["B008", "RUF009"]

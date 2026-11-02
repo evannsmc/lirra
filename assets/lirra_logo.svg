@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60" role="img" aria-label="LIRRA logo: patrol path around the square S">
+  <!-- Soft tinted background -->
+  <rect width="60" height="60" rx="9" fill="#eef3f9"/>
+
+  <!-- Square S -->
+  <rect x="17" y="17" width="26" height="26" rx="2" fill="#7cc48a" fill-opacity="0.55" stroke="#2e7d32" stroke-width="1.4"/>
+
+  <!-- Nominal patrol diamond: its straight legs cut through S -->
+  <path d="M 30 8 L 52 30 L 30 52 L 8 30 Z" fill="none" stroke="#7a8696" stroke-width="1.2" stroke-dasharray="2.4 2"/>
+
+  <!-- Verified plan: skirts the corners of S, leaves it in time -->
+  <path d="M 30 8 C 42 9, 46 12, 48 18 C 50 23, 52 26, 52 30
+           C 52 34, 50 40, 46 45 C 42 50, 36 52, 30 52
+           C 24 52, 16 50, 13 44 C 10 38, 8 34, 8 30
+           C 8 25, 10 18, 15 13 C 19 9, 24 8, 30 8 Z"
+        fill="none" stroke="#2b5c9e" stroke-width="2.6" stroke-linecap="round"/>
+
+  <!-- Waypoints -->
+  <circle cx="30" cy="8" r="2.6" fill="#c0392b"/>
+  <circle cx="52" cy="30" r="2.6" fill="#c0392b"/>
+  <circle cx="30" cy="52" r="2.6" fill="#c0392b"/>
+  <circle cx="8" cy="30" r="2.6" fill="#c0392b"/>
+</svg>
