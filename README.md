@@ -25,8 +25,8 @@ feasibility therefore hold for any proposer and any solver completion time, whil
 needed on only a few percent of planning steps.
 
 <p align="center">
-  <img src="assets/x2_theta_plus_composite.png" width="92%" alt="LIRRA on the Skydio X2 around the keep-out cube"><br>
-  <em>Skydio X2 (MuJoCo) patrolling around the keep-out cube under LIRRA. Left: top-down view and the
+  <img src="assets/x2_theta_plus_composite.png" width="92%" alt="LIRRA on the Skydio X2 around the restricted cube"><br>
+  <em>Skydio X2 (MuJoCo) patrolling around the restricted cube under LIRRA. Left: top-down view and the
   plan in force (blue: accepted proposal, orange: solver, grey: cached). Right: MuJoCo view, the
   realized robustness, and the robustness of each proposal. Videos of all eight specifications are on
   the <a href="https://evannsmc.github.io/rl-stl/case_studies.html">project site</a>.</em>
@@ -39,7 +39,7 @@ needed on only a few percent of planning steps.
 ## Results at a Glance
 
 Always-on interval-STL runtime assurance (synthesis at every step) against LIRRA, 30 episodes per
-row, on the paper's four specifications around a 3-D keep-out cube (θ: leave within 4 s; φ: leave
+row, on the paper's four specifications around a 3-D restricted cube, which may be entered only briefly (θ: leave within 4 s; φ: leave
 within 3 s and stay out 1 s; ⁺: uncertain cube boundaries).
 
 | System | Spec. | LIRRA fallbacks / step | Time I-STL [ms/step] | Time LIRRA [ms/step] | Violations |

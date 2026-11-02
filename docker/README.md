@@ -60,8 +60,8 @@ stops. `SYS` is `x2`, `blimp` or `di`; `SPEC` selects one of the eight specifica
 
 | `SPEC` | Specification |
 |---|---|
-| `theta`, `phi` | θ (leave the keep-out region within 4 s) and φ (leave within 3 s and stay out 1 s), planar square |
-| `theta_plus`, `phi_plus` | the same on the 3-D keep-out cube (the paper's θ and φ) |
+| `theta`, `phi` | θ (leave the restricted region within 4 s) and φ (leave within 3 s and stay out 1 s), planar square |
+| `theta_plus`, `phi_plus` | the same on the 3-D restricted cube (the paper's θ and φ) |
 | `theta_u`, `phi_u` | square with uncertain boundaries |
 | `theta_plus_u`, `phi_plus_u` | cube with uncertain boundaries (the paper's θ⁺ and φ⁺) |
 
