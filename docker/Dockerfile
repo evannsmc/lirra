@@ -21,8 +21,9 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/lirra-venv \
     MUJOCO_GL=egl \
     PYOPENGL_PLATFORM=egl \
     RL_STL_DEVICE=auto \
-    XLA_PYTHON_CLIENT_PREALLOCATE=false \
-    GRB_LICENSE_FILE=/opt/gurobi/gurobi.lic
+    XLA_PYTHON_CLIENT_PREALLOCATE=false
+# Gurobi finds a licence mounted at its default path /opt/gurobi/gurobi.lic (docker/makefile `make run`);
+# without one it falls back to the size-limited pip licence (enough for the double integrator).
 
 WORKDIR /workspace/lirra
 
@@ -32,9 +33,11 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --locked --no-install-project ${JAX_EXTRA:+--extra $JAX_EXTRA}
 COPY . .
 RUN uv sync --locked ${JAX_EXTRA:+--extra $JAX_EXTRA} && \
-    python -c "import rl_stl, mujoco, jax, gurobipy; print('rl_stl', rl_stl.__file__, '| jax', jax.__version__)"
+    python -c "import rl_stl, mujoco, jax, gurobipy; print('rl_stl', rl_stl.__file__, '| jax', jax.__version__)" && \
+    python -c "from mujoco_playground._src import mjx_env; mjx_env.ensure_menagerie_exists(); print('menagerie', mjx_env.MENAGERIE_PATH)"
 
 RUN mkdir -p /opt/gurobi && chmod 777 /workspace/lirra && \
-    echo 'echo "LIRRA environment. Gurobi licence: ${GRB_LICENSE_FILE} ($( [ -f "${GRB_LICENSE_FILE}" ] && echo found || echo "missing: mount a WLS licence, see docker/README.md"))"' >> /etc/bash.bashrc
+    echo 'export PATH=/opt/lirra-venv/bin:$PATH' > /etc/profile.d/lirra.sh && \
+    echo 'echo "LIRRA environment. Gurobi licence: $( [ -f /opt/gurobi/gurobi.lic ] && echo "found at /opt/gurobi/gurobi.lic" || echo "none mounted (size-limited pip licence; mount a WLS licence for the X2 and blimp, see docker/README.md)")"' >> /etc/bash.bashrc
 
 CMD ["/bin/bash"]
