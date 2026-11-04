@@ -20,7 +20,9 @@ This image ships a complete environment for every LIRRA experiment:
 
 - **Base:** `ghcr.io/astral-sh/uv` (Debian bookworm, Python 3.12)
 - **Python:** MuJoCo/MJX 3.13.0, MuJoCo Playground 0.2.0, Brax 0.14.2, JAX 0.11.1 (CPU), Flax,
-  `stlpy` 0.3.0, `gurobipy` 13.0.3, and the LIRRA code (`rl_stl`)
+  `stlpy` 0.3.0, `gurobipy` 13.0.3
+- **Code:** not baked in; `make run` mounts your clone of the repository, so code updates need no
+  new image
 - **System:** EGL/OSMesa offscreen rendering, ffmpeg
 - **Trained proposers** (`policies/`) for the Skydio X2 and the double integrator; the remaining
   X2 and blimp proposers are coming soon

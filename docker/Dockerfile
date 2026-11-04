@@ -1,5 +1,9 @@
 # LIRRA: environment for every experiment of the paper (CPU JAX by default).
 #
+# The image holds only the dependencies. The code is not copied in: `make run` mounts your clone at
+# /workspace/lirra and PYTHONPATH points at its src/, so code changes need no rebuild. Rebuild only when
+# pyproject.toml or uv.lock change.
+#
 #   docker build -f docker/Dockerfile -t lirra .                        # from the repository root
 #   docker build -f docker/Dockerfile --build-arg JAX_EXTRA=cuda12 -t lirra:cuda .   # NVIDIA GPU
 FROM ghcr.io/astral-sh/uv:0.8-python3.12-bookworm-slim
@@ -28,16 +32,16 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/lirra-venv \
 WORKDIR /workspace/lirra
 
 ARG JAX_EXTRA=""
-# Dependencies first (cached layer), then the project itself (editable, from src/)
-COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --locked --no-install-project ${JAX_EXTRA:+--extra $JAX_EXTRA}
-COPY . .
-RUN uv sync --locked ${JAX_EXTRA:+--extra $JAX_EXTRA} && \
-    python -c "import rl_stl, mujoco, jax, gurobipy; print('rl_stl', rl_stl.__file__, '| jax', jax.__version__)" && \
+# Dependencies only (the lirra package itself comes from the mounted clone, see PYTHONPATH below)
+COPY pyproject.toml uv.lock README.md /opt/lirra-deps/
+RUN cd /opt/lirra-deps && uv sync --locked --no-install-project ${JAX_EXTRA:+--extra $JAX_EXTRA} && \
+    python -c "import mujoco, jax, gurobipy; print('mujoco', mujoco.__version__, '| jax', jax.__version__)" && \
     python -c "from mujoco_playground._src import mjx_env; mjx_env.ensure_menagerie_exists(); print('menagerie', mjx_env.MENAGERIE_PATH)"
+ENV PYTHONPATH=/workspace/lirra/src
 
 RUN mkdir -p /opt/gurobi && chmod 777 /workspace/lirra && \
     echo 'export PATH=/opt/lirra-venv/bin:$PATH' > /etc/profile.d/lirra.sh && \
+    echo '[ -d /workspace/lirra/src/rl_stl ] || echo "No LIRRA code at /workspace/lirra: start the container with make run from your clone (it mounts the repository)."' >> /etc/bash.bashrc && \
     echo 'echo "LIRRA environment. Gurobi licence: $( [ -f /opt/gurobi/gurobi.lic ] && echo "found at /opt/gurobi/gurobi.lic" || echo "none mounted (size-limited pip licence; mount a WLS licence for the X2 and blimp, see docker/README.md)")"' >> /etc/bash.bashrc
 
 CMD ["/bin/bash"]

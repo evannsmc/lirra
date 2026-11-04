@@ -9,7 +9,11 @@ Every LIRRA experiment runs inside a Docker container with all dependencies inst
 
 **Python environment** (`/opt/lirra-venv`, from `uv.lock`): MuJoCo/MJX 3.13.0, MuJoCo Playground
 0.2.0, Brax 0.14.2, JAX 0.11.1 (CPU; CUDA 12 with `make build-gpu`), Flax, Optax, `stlpy` 0.3.0,
-`gurobipy` 13.0.3, and the `rl_stl` package from `src/` (editable).
+`gurobipy` 13.0.3.
+
+**Code:** not part of the image. `make run` mounts your clone at `/workspace/lirra`, and `PYTHONPATH`
+points at its `src/`, so pulling or editing the code needs no rebuild. Rebuild (or pull a new image)
+only when `pyproject.toml` or `uv.lock` change.
 
 **System libraries:** EGL/OSMesa for offscreen MuJoCo rendering, `ffmpeg` for videos.
 
