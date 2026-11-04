@@ -17,6 +17,13 @@ Definitions (the same as the performance table of ``followup_tables.py``):
 * Nominal-predicate ablation (``_u`` specs): always-on synthesis that plans and checks with the nominal predicates
   (``*_fu_always_on_nominal``), scored against the same true regions.
 * Per call: solve = total solve wall / number of runtime solves; inference and check = total time / number of calls.
+* Progress (tolerance-free, ``patrol_progress``): signed advance along the closed polyline through the waypoints in
+  patrol order, in legs (one leg = one waypoint), mean over episodes; miss (``waypoint_miss``): mean distance to a
+  waypoint at the moments the progress passes it [m], mean over the episodes that pass one. Both are read from
+  re-evaluations of the same loops and proposers (``*_<spec>_pm_always_on``, ``*_<spec>_pm_ppoC_shield``; the
+  LIRRA policy must equal the one of the run the other columns come from, otherwise the cells read --); every
+  other column keeps coming from the runs above. The details table states whether the re-evaluation reproduced
+  the per-episode fallback fraction, waypoints in order and satisfaction of those runs.
 
 CPU energy is not tabulated: the in-loop RAPL numbers are not valid measurements (see the energy section of the
 output and ``energy_diagnostic``).
@@ -29,7 +36,10 @@ from __future__ import annotations
 import argparse
 import json
 
+from pathlib import Path
+
 import numpy as np
+import yaml
 from followup_tables import EVAL, OUT, loop_perf, stats
 
 SYSTEMS = ["x2", "blimp"]
@@ -39,15 +49,49 @@ LOOPS = {"istl": "always_on", "lirra": "ppoC_shield"}
 # blimp proposers retrained with as many expert labels as the X2. Always-on
 # I-STL and the nominal-predicate ablation do not depend on the proposer and always come from "fu".
 RUNS = {"x2": "fu", "blimp": "fulm"}
+PM = "pm"  # run family of the progress re-evaluations (patrol_progress, waypoint_miss)
+
+
+def latest(system: str, spec: str, tag: str, run: str = "fu") -> Path | None:
+    """Directory of the latest ``*_<spec>_<run>_<tag>`` evaluation with episodes."""
+    ds = sorted(d for d in (EVAL / system).glob(f"*_{spec}_{run}_{tag}") if (d / "episodes.jsonl").exists())
+    return ds[-1] if ds else None
 
 
 def episodes(system: str, spec: str, tag: str, run: str = "fu") -> list[dict] | None:
     """Completed episodes of the latest ``*_<spec>_<run>_<tag>`` evaluation."""
-    ds = sorted(d for d in (EVAL / system).glob(f"*_{spec}_{run}_{tag}") if (d / "episodes.jsonl").exists())
-    if not ds:
+    d = latest(system, spec, tag, run)
+    if d is None:
         return None
-    with open(ds[-1] / "episodes.jsonl") as fh:
+    with open(d / "episodes.jsonl") as fh:
         return [e for e in map(json.loads, fh) if "n_steps" in e] or None
+
+
+def policy(d: Path) -> str | None:
+    return yaml.safe_load(open(d / "config.yaml")).get("policy")
+
+
+def progress(system: str, spec: str, tag: str, run: str) -> dict:
+    """Patrol progress and waypoint miss from the ``pm`` re-evaluation of the loop read from ``<run>``, and
+    whether it reproduced that run per episode (fallback fraction, waypoints in order, satisfaction, matched by
+    (level, start)). Empty if there is no ``pm`` run with the same policy."""
+    ref, d = latest(system, spec, tag, run), latest(system, spec, tag, PM)
+    if ref is None or d is None or policy(d) != policy(ref):
+        return {}
+    E = episodes(system, spec, tag, PM)
+    miss = [e["waypoint_miss"] for e in E if e["waypoint_miss"] is not None and np.isfinite(e["waypoint_miss"])]
+    key = ("synthesis_call_fraction", "waypoints_reached", "satisfied")
+    new = {(e["level"], e["seed"]): tuple(e[k] for k in key) for e in E}
+    old = {(e["level"], e["seed"]): tuple(e[k] for k in key) for e in episodes(system, spec, tag, run)}
+    diff = {}  # (level, start) -> differing quantities ("episode" if it ran in only one of the two)
+    for k in sorted(old.keys() | new.keys()):
+        o, n = old.get(k), new.get(k)
+        if o is None or n is None:
+            diff[k] = ["episode"]
+        elif o != n:
+            diff[k] = [q for q, a, b in zip(("fallbacks", "waypoints", "satisfaction"), o, n) if a != b]
+    return {"progress": float(np.mean([e["patrol_progress"] for e in E])),
+            "miss": float(np.mean(miss)) if miss else None, "pm_dir": d.name, "pm_mismatch": diff}
 
 
 def errors(system: str, spec: str, tag: str, run: str = "fu") -> list[dict]:
@@ -86,7 +130,8 @@ def collect() -> dict:
                 run = RUNS[s] if name == "lirra" else "fu"
                 E = episodes(s, sp, tag, run)
                 r[name] = {**stats(E), **loop_perf(E), "errors": errors(s, sp, tag, run),
-                           "energy": energy_diagnostic(E), **true_region(E), "run": run}
+                           "energy": energy_diagnostic(E), **true_region(E), "run": run,
+                           **progress(s, sp, tag, run)}
             if sp.endswith("_u"):
                 E = episodes(s, sp, "always_on_nominal")
                 r["nominal"] = {**stats(E), **true_region(E), "errors": errors(s, sp, "always_on_nominal")}
@@ -112,9 +157,12 @@ def render(res: dict) -> str:
          "count; injected latency d = 1, 10 starts x 3 uncertainty levels). Time per step = "
          "(solve + inference + check wall time) / planning steps, pooled over episodes; one Gurobi thread, "
          "several evaluations sharing the node. Waypoints for the cube specs: in patrol order (order-free visits). "
-         "Uncertain-predicate specs (^u): Viol. counts violations of the true keep-out region.",
+         "Uncertain-predicate specs (^u): Viol. counts violations of the true keep-out region. Progress: "
+         "tolerance-free advance along the patrol polyline in legs (one leg = one waypoint), mean per episode; "
+         "miss: mean distance to a waypoint when passing it [m] (both from the `pm` re-evaluations).",
          "", "| System | Spec | Fallbacks/step | Time I-STL [ms/step] | Time LIRRA [ms/step] | Waypoints I-STL | "
-         "Waypoints LIRRA | Viol. (LIRRA) |", "|---|---|---|---|---|---|---|---|"]
+         "Waypoints LIRRA | Progress I-STL | Progress LIRRA | Miss I-STL [m] | Miss LIRRA [m] | Viol. (LIRRA) |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for key, r in res.items():
         s, sp = key.split("/")
         a, b = r["istl"], r["lirra"]
@@ -122,8 +170,8 @@ def render(res: dict) -> str:
                                                      and "_plus" in sp else ""))
         viol = b.get("true_violated", b["violated_episodes"])
         L.append(f"| {s} | {sym[sp]} | {fr(b['calls'])} | {ms(a['compute_ms_per_step'])} | "
-                 f"{ms(b['compute_ms_per_step'])} | {wp(a)} | {wp(b)} | "
-                 f"{viol}/{b['episodes']} |")
+                 f"{ms(b['compute_ms_per_step'])} | {wp(a)} | {wp(b)} | {ms(a.get('progress'))} | "
+                 f"{ms(b.get('progress'))} | {ms(a.get('miss'), 2)} | {ms(b.get('miss'), 2)} | {viol}/{b['episodes']} |")
     L += ["", "## Uncertain predicates: true-region violations", "",
           "True keep-out region drawn per episode inside the predicate uncertainty set (half-width +-0.05 m, "
           "rotation +-0.05 rad; same region for every loop of a start). Nominal = always-on synthesis planning and "
@@ -144,20 +192,35 @@ def render(res: dict) -> str:
     L += ["", "## Details", "",
           "| System | Spec | I-STL sat. / episodes | I-STL errored | I-STL deadline misses | LIRRA sat. / episodes | "
           "LIRRA errored | LIRRA deadline misses | LIRRA fallbacks / episode | solve per fallback (ms) | "
-          "I-STL solve per call (ms) | inference per call (ms) | check per call (ms) | solves without plan (I-STL / LIRRA) |",
-          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+          "I-STL solve per call (ms) | inference per call (ms) | check per call (ms) | solves without plan (I-STL / LIRRA) | "
+          "progress re-evaluation reproduces (I-STL / LIRRA) |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for key, r in res.items():
         s, sp = key.split("/")
         a, b = r["istl"], r["lirra"]
 
         def err(x):
             return "; ".join(f"level {e['level']} start {e['seed']}: {e['error']}" for e in x["errors"]) or "0"
+
+        def rep(x):
+            if "pm_mismatch" not in x:
+                return "--"
+            m = x["pm_mismatch"]
+            if not m:
+                return "yes"
+            qs = sorted({q for v in m.values() for q in v})
+            return f"no: {len(m)}/{x['episodes']} episodes differ in {', '.join(qs)}"
         L.append(f"| {s} | {sym[sp]} | {a['satisfied']}/{a['episodes']} | {err(a)} | {a['deadline_miss']} | "
                  f"{b['satisfied']}/{b['episodes']} | {err(b)} | {b['deadline_miss']} | "
                  f"{b['solves_per_episode']:.2f} | {ms(b['solve_ms'])} | {ms(a['solve_ms'])} | "
-                 f"{ms(b['rl_ms'], 2)} | {ms(b['check_ms'], 2)} | {a['no_plan']} / {b['no_plan']} |")
+                 f"{ms(b['rl_ms'], 2)} | {ms(b['check_ms'], 2)} | {a['no_plan']} / {b['no_plan']} | "
+                 f"{rep(a)} / {rep(b)} |")
     L += ["", "Deadline misses are 0 by construction in these runs (injected latency: every result is used d steps "
-          "after its request); measured-latency runs exist only for theta/phi (`*_fu_*_measured`). Solves without plan: "
+          "after its request); measured-latency runs exist only for theta/phi (`*_fu_*_measured`). Progress re-evaluation "
+          "reproduces: the `pm` run has the same per-episode fallback fraction, waypoints in order and satisfaction as "
+          "the run of the other columns, matched by (level, start). Differences occur only on the X2, in episodes "
+          "where a runtime solve reaches the wall-clock Gurobi time limit (0.8 d dt = 160 ms), whose outcome depends on "
+          "the node load. Solves without plan: "
           "runtime solves whose Gurobi status was neither optimal nor suboptimal (e.g. the 0.8 d dt time limit hit "
           "without an incumbent); the vehicle keeps the cached plan.", "",
           "## CPU energy: not valid", "",

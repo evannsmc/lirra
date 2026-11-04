@@ -29,6 +29,21 @@ rooted at step ``k`` tracks ``x_nom(k..k+N)``. The ``waypoints`` metric
 counts waypoints the vehicle itself reaches (tolerance as in the evaluation), whichever
 reference the reward uses.
 
+Optional path-accuracy term (``c_wp > 0``; off by default): the executed state's progress along the
+closed patrol polyline through the waypoints (the projection of :func:`rl_stl.evaluation.patrol.
+patrol_progress`) is tracked, and a step on which it passes a waypoint is scored as in
+:func:`~rl_stl.evaluation.patrol.waypoint_miss`: with ``miss`` the distance to the waypoint at the
+(linearly interpolated) crossing,
+
+    r_wp = c_wp * ( 1[forward pass] * max(0, 1 - miss / wp_radius)  -  1[backward pass] )
+
+so a precise pass earns up to ``c_wp``, a pass ``wp_radius`` away nothing, and crossing a waypoint
+backwards costs the full bonus (no gain from oscillating across a waypoint). With
+``wp_target = "plan"`` the same score is summed over the steps of the proposed segment ``X`` (its
+``f_syn`` rollout from the current state) instead of the executed step, so the term rates the action
+itself at every planning step whose segment passes a waypoint. It only shapes the
+reward; the runtime check, the certificate terms and the fallback dynamics are unchanged.
+
 With ``fallback`` the env models the checked loop: a proposal that fails the runtime check
 (``cert < 0``) is not flown; the vehicle follows the cached plan (the last accepted proposal),
 reaching its next nominal state up to the tube error as the tracker does (constant tube) or
@@ -69,6 +84,9 @@ class PlanEnvConfig:
     waypoint_metric_tol: float = 0.25  # as experiments/patrol/evaluate.py::summarize
     fallback: bool = False  # rejected proposals are replaced by the cached plan (checked loop)
     c_syn: float = 0.0  # price of the synthesis call triggered by a rejected proposal
+    c_wp: float = 0.0  # path-accuracy bonus per waypoint pass (0: off, reward unchanged)
+    wp_radius: float = 0.5  # pass distance [m] at which the path-accuracy bonus reaches 0
+    wp_target: str = "executed"  # passes scored: "executed" (the flown step) or "plan" (the proposed segment)
 
 
 class PatrolPlanEnv:
@@ -98,6 +116,7 @@ class PatrolPlanEnv:
         self.reg = [(a.pos, a.vel, a.input, a.kp, a.kd, sp) for a, sp in nominal.regulated]
         self.wps = jnp.asarray(nominal.waypoints)
         self.wp_tol = float(nominal.waypoint_tol)
+        self.leg_a, self.leg_ab = self.wps, jnp.roll(self.wps, -1, axis=0) - self.wps
         self.u_lo, self.u_hi = jnp.asarray(T.u_lo), jnp.asarray(T.u_hi)
         self.clock = T.reference == "clock"
 
@@ -164,6 +183,29 @@ class PatrolPlanEnv:
         Un = jax.lax.dynamic_slice(s["Uref"], (k, 0), (N, m))
         return Xn, Un, s["Iref"][k]
 
+    def _patrol_s(self, p):
+        """Path parameter of ``p`` on the closed polyline through the waypoints, in ``[0, n_wp]``
+        (as :func:`rl_stl.evaluation.patrol._patrol_projection`)."""
+        A, AB = self.leg_a, self.leg_ab
+        t = jnp.clip(jnp.sum((p[None] - A) * AB, axis=1) / jnp.sum(AB * AB, axis=1), 0.0, 1.0)
+        d = jnp.linalg.norm(p[None] - (A + t[:, None] * AB), axis=1)
+        i = jnp.argmin(d)
+        return i + t[i]
+
+    def _waypoint_pass(self, p0, p1):
+        """``(forward pass, backward pass, miss [m])`` of the step ``p0 -> p1`` across a waypoint
+        (at most one per step; the waypoint legs are much longer than one step)."""
+        n = self.n_wp
+        s0, s1 = self._patrol_s(p0), self._patrol_s(p1)
+        ds = jnp.mod(s1 - s0 + n / 2, n) - n / 2
+        s1 = s1 + n * jnp.round((s0 + ds - s1) / n)  # unwrapped next to s0, exact (no s0 + ds rounding)
+        fwd = (ds > 0) & (jnp.floor(s1) > jnp.floor(s0))
+        bwd = (ds < 0) & (jnp.floor(s0) > jnp.floor(s1))
+        m = jnp.floor(jnp.maximum(s0, s1))
+        f = jnp.clip((m - s0) / jnp.where(ds == 0, 1.0, ds), 0.0, 1.0)
+        miss = jnp.linalg.norm(p0 + f * (p1 - p0) - self.wps[jnp.mod(m, n).astype(jnp.int32)])
+        return fwd, bwd, miss
+
     # ----------------------------------------------------------------- helpers
     def _obs(self, s):
         fw = s["first_window"]
@@ -204,7 +246,8 @@ class PatrolPlanEnv:
         data["hc"] = False  # a certified plan has been cached
         metrics = {"cert_ok": jnp.zeros(()), "cert": jnp.zeros(()), "plan_cost": jnp.zeros(()),
                    "realised_violation": jnp.zeros(()), "waypoints": jnp.zeros(()), "reward": jnp.zeros(()),
-                   "rejected": jnp.zeros(())}
+                   "rejected": jnp.zeros(()), "wp_pass": jnp.zeros(()), "wp_pass_miss": jnp.zeros(()),
+                   "wp_bonus": jnp.zeros(())}
         return mjx_env.State(data, self._obs(data), jnp.zeros(()), jnp.zeros(()), metrics, {})
 
     def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
@@ -264,6 +307,14 @@ class PatrolPlanEnv:
             sat = jnp.maximum(m[0], jnp.max(G))
         violated = jnp.where(s["first_window"] == 0, 1.0 - sat, 0.0)
         reward = reward - 5.0 * violated
+        fwd, bwd, miss = self._waypoint_pass(s["x"][self.pos], x_next[self.pos])
+        if cfg.wp_target == "plan":  # passes of the proposed segment (scores the action directly)
+            pf, pb, pm = jax.vmap(self._waypoint_pass)(X[:-1, self.pos], X[1:, self.pos])
+            wp_bonus = cfg.c_wp * jnp.sum(pf * jnp.maximum(0.0, 1.0 - pm / cfg.wp_radius) - pb)
+        else:
+            wp_bonus = cfg.c_wp * (fwd * jnp.maximum(0.0, 1.0 - miss / cfg.wp_radius) - bwd)
+        if cfg.c_wp != 0.0:  # off by default: the reward graph is then exactly the previous one
+            reward = reward + wp_bonus
         wp = self._advance(x_next, s["wp"])
         reached = jnp.linalg.norm(self.wps[s["wp_real"]] - x_next[self.pos]) < cfg.waypoint_metric_tol
         wp_real = jnp.where(reached, (s["wp_real"] + 1) % self.n_wp, s["wp_real"])
@@ -271,5 +322,7 @@ class PatrolPlanEnv:
                 "k": s["k"] + 1, "rng": rng, "Xc": Xc, "Uc": Uc, "jc": jc, "hc": hc}
         metrics = {"cert_ok": ok.astype(jnp.float32), "cert": jnp.clip(cert, -BIG, BIG),
                    "plan_cost": J, "realised_violation": violated, "waypoints": reached.astype(jnp.float32),
-                   "reward": reward, "rejected": 1.0 - accepted.astype(jnp.float32)}
+                   "reward": reward, "rejected": 1.0 - accepted.astype(jnp.float32),
+                   "wp_pass": fwd.astype(jnp.float32), "wp_pass_miss": jnp.where(fwd, miss, 0.0),
+                   "wp_bonus": wp_bonus}
         return mjx_env.State(data, self._obs(data), reward, jnp.zeros(()), metrics, state.info)

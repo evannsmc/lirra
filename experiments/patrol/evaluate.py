@@ -36,7 +36,9 @@ from rl_stl.evaluation.energy import EnergyMeter, benchmark
 from rl_stl.evaluation.patrol import (
     ExpertProposer,
     nominal_proposer,
+    patrol_progress,
     uncertain_scores,
+    waypoint_miss,
     waypoint_visits,
     waypoints_reached,
 )
@@ -98,6 +100,8 @@ def summarize(setup, ep: dict, eps_planar: float | None, region: dict | None = N
         "check_s": stat(None, [r["check_s"] for r in steps if "check_s" in r]),
         "waypoints_reached": reached,
         "waypoint_visits": waypoint_visits(setup, X),
+        "patrol_progress": patrol_progress(setup, X),
+        "waypoint_miss": waypoint_miss(setup, X),
         "max_planar_tracking_error": float(planar_err.max()),
         **ep["sim_info"],
     }

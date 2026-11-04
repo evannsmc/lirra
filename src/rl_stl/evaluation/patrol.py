@@ -325,6 +325,49 @@ def waypoint_visits(setup: PatrolSetup, X: np.ndarray, tol: float = 0.25) -> int
     return visits
 
 
+def _patrol_projection(setup: PatrolSetup, X: np.ndarray):
+    """Projection of the output samples onto the closed patrol polyline (waypoints in patrol order):
+    path parameter ``s`` in ``[0, n)`` and distance to the polyline, per sample."""
+    wps = np.asarray(setup.task.waypoints(), float)
+    P = X @ setup.problem.C_out.T
+    A, B = wps, np.roll(wps, -1, axis=0)
+    AB = B - A
+    t = np.clip(np.einsum("kij,ij->ki", P[:, None, :] - A[None], AB) / np.sum(AB * AB, axis=1), 0.0, 1.0)
+    dist = np.linalg.norm(P[:, None, :] - (A[None] + t[..., None] * AB[None]), axis=2)
+    i = np.argmin(dist, axis=1)
+    k = np.arange(len(P))
+    return i + t[k, i], dist[k, i], len(wps)
+
+
+def waypoint_miss(setup: PatrolSetup, X: np.ndarray) -> float:
+    """Mean distance to a waypoint at the moments the patrol progress (:func:`patrol_progress`) passes it
+    [m], linearly interpolated between samples; NaN if no waypoint is passed. Complements the progress
+    count: how precisely the patrol goes through its waypoints."""
+    wps = np.asarray(setup.task.waypoints(), float)
+    P = X @ setup.problem.C_out.T
+    s, _, n = _patrol_projection(setup, X)
+    su = s[0] + np.concatenate([[0.0], np.cumsum((np.diff(s) + n / 2) % n - n / 2)])
+    miss = []
+    for k in range(len(su) - 1):
+        a, b = su[k], su[k + 1]
+        for m in range(int(np.floor(min(a, b))) + 1, int(np.floor(max(a, b))) + 1):
+            if b > a:  # forward passes only
+                f = (m - a) / (b - a)
+                miss.append(np.linalg.norm(P[k] + f * (P[k + 1] - P[k]) - wps[m % n]))
+    return float(np.mean(miss)) if miss else float("nan")
+
+
+def patrol_progress(setup: PatrolSetup, X: np.ndarray) -> float:
+    """Tolerance-free patrol progress in waypoint legs: every output sample is projected onto the closed
+    polyline through the waypoints in patrol order (parameter ``s`` in ``[0, n)``, leg ``i`` from waypoint
+    ``i`` to ``i + 1``), and the signed advance of ``s`` is summed over the trajectory (backtracking
+    counts negatively; jumps are wrapped to ``(-n/2, n/2]``). One leg corresponds to one waypoint of
+    :func:`waypoints_reached`, without its distance tolerance or its stop after a missed waypoint."""
+    s, _, n = _patrol_projection(setup, X)
+    ds = (np.diff(s) + n / 2) % n - n / 2
+    return float(np.sum(ds))
+
+
 def episode_summary(setup: PatrolSetup, ep: dict) -> dict:
     steps, solves = ep["steps"], ep["solves"]
     n = len(steps)
@@ -354,6 +397,8 @@ def episode_summary(setup: PatrolSetup, ep: dict) -> dict:
         "solve_energy_pkg_j": stat("solve_net_energy_package-0_j"),
         "waypoints_reached": reached,
         "waypoint_visits": waypoint_visits(setup, X),
+        "patrol_progress": patrol_progress(setup, X),
+        "waypoint_miss": waypoint_miss(setup, X),
         "mean_speed": float(np.mean(np.linalg.norm(X[:, setup.task.dim:2 * setup.task.dim], axis=1))),
         "max_tracking_error": float(max(s["tracking_error"] for s in steps)),
     }

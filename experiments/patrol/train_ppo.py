@@ -43,6 +43,11 @@ AP.add_argument("--c-ok", type=float, default=None, help="bonus for a certified 
 AP.add_argument("--eps-cert", type=float, default=None, help="certification margin of the reward (default: PlanEnvConfig)")
 AP.add_argument("--fallback", action="store_true", help="fly the cached plan when a proposal fails the check")
 AP.add_argument("--c-syn", type=float, default=None, help="price of a rejected proposal's synthesis call (default: PlanEnvConfig)")
+AP.add_argument("--c-wp", type=float, default=None,
+                help="path-accuracy bonus per waypoint pass, scaled by max(0, 1 - miss/wp_radius) (default 0: off)")
+AP.add_argument("--wp-radius", type=float, default=None, help="pass distance [m] at which the bonus is 0 (default 0.5)")
+AP.add_argument("--wp-target", default=None, choices=["executed", "plan"],
+                help="passes scored by --c-wp: the executed step or the proposed segment (default executed)")
 AP.add_argument("--num-evals", type=int, default=10)
 AP.add_argument("--seed", type=int, default=0)
 AP.add_argument("--device", default="auto", choices=["cpu", "gpu", "auto"])
@@ -83,7 +88,8 @@ def main() -> None:
     obs_mean = bc.obs_mean if bc else np.zeros(T.obs_size, np.float32)
     obs_std = bc.obs_std if bc else np.ones(T.obs_size, np.float32)
     weights = {k: v for k, v in dict(c_cost=ARGS.c_cost, c_cert=ARGS.c_cert, c_ok=ARGS.c_ok, eps_cert=ARGS.eps_cert,
-                                     c_syn=ARGS.c_syn).items() if v is not None}
+                                     c_syn=ARGS.c_syn, c_wp=ARGS.c_wp, wp_radius=ARGS.wp_radius,
+                                     wp_target=ARGS.wp_target).items() if v is not None}
     cfg = PlanEnvConfig(episode_steps=ARGS.episode_steps, **weights, fallback=ARGS.fallback,
                         uncertainty="disturbance" if system.name == "di" else "tube")
     env = PatrolPlanEnv(T, setups[0].nominal, p.track_weight, p.gamma0, p.n_cost, p.effort_weight,
