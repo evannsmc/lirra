@@ -24,8 +24,8 @@ This image ships a complete environment for every LIRRA experiment:
 - **Code:** not baked in; `make run` mounts your clone of the repository, so code updates need no
   new image
 - **System:** EGL/OSMesa offscreen rendering, ffmpeg
-- **Trained proposers** (`policies/`) for the Skydio X2 and the double integrator; the remaining
-  X2 and blimp proposers are coming soon
+- **Trained proposers** (`policies/` in the repository) behind the paper's results, for the Skydio X2,
+  the blimp and the double integrator on all eight specifications
 
 ## Quick Start
 

@@ -6,26 +6,23 @@ cloning and PPO) behind the paper's results for that system and specification. T
 
 | System | `SPEC` | Specification | Status |
 |---|---|---|---|
-| `blimp` | `phi` | φ, square | coming soon |
-| `blimp` | `phi_plus` | φ, cube | coming soon |
-| `blimp` | `phi_plus_u` | φ, cube, uncertain | coming soon |
-| `blimp` | `phi_u` | φ, square, uncertain | coming soon |
-| `blimp` | `theta` | θ, square | coming soon |
-| `blimp` | `theta_plus` | θ, cube | coming soon |
-| `blimp` | `theta_plus_u` | θ, cube, uncertain | coming soon |
-| `blimp` | `theta_u` | θ, square, uncertain | coming soon |
+| `blimp` | `phi` | φ, square | included |
+| `blimp` | `phi_plus` | φ, cube | included |
+| `blimp` | `phi_plus_u` | φ, cube, uncertain | included |
+| `blimp` | `phi_u` | φ, square, uncertain | included |
+| `blimp` | `theta` | θ, square | included |
+| `blimp` | `theta_plus` | θ, cube | included |
+| `blimp` | `theta_plus_u` | θ, cube, uncertain | included |
+| `blimp` | `theta_u` | θ, square, uncertain | included |
 | `di` | `phi` | φ, square | included |
 | `di` | `phi_plus` | φ, cube | included |
 | `di` | `theta` | θ, square | included |
 | `di` | `theta_plus` | θ, cube | included |
 | `x2` | `phi` | φ, square | included |
 | `x2` | `phi_plus` | φ, cube | included |
-| `x2` | `phi_plus_u` | φ, cube, uncertain | coming soon |
-| `x2` | `phi_u` | φ, square, uncertain | coming soon |
+| `x2` | `phi_plus_u` | φ, cube, uncertain | included |
+| `x2` | `phi_u` | φ, square, uncertain | included |
 | `x2` | `theta` | θ, square | included |
 | `x2` | `theta_plus` | θ, cube | included |
-| `x2` | `theta_plus_u` | θ, cube, uncertain | coming soon |
-| `x2` | `theta_u` | θ, square, uncertain | coming soon |
-
-Proposers marked *coming soon* will be added shortly; until then, train one with the pipeline in
-`docker/README.md` and pass it with `POLICY=...`.
+| `x2` | `theta_plus_u` | θ, cube, uncertain | included |
+| `x2` | `theta_u` | θ, square, uncertain | included |
